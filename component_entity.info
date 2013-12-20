@@ -1,0 +1,25 @@
+name = Component Entity
+description = Provides entity functionality as an example to use in your own development projects
+core = 7.x
+package = Webform
+
+dependencies[] = taxonomy
+dependencies[] = entity
+dependencies[] = webform
+dependencies[] = views_ui
+dependencies[] = views_bulk_operations
+
+files[] = generator/component_entity_generator.inc
+files[] = generator/field_generator.inc
+files[] = component_entity.admin.inc
+files[] = component_entity_type.admin.inc
+files[] = includes/ComponentEntityUIController.inc
+files[] = includes/ComponentEntity.inc
+files[] = includes/ComponentEntityController.inc
+files[] = includes/ComponentEntityType.inc
+files[] = includes/ComponentEntityTypeController.inc
+files[] = views/component_entity.views.inc
+files[] = views/component_entity_handler_link_field.inc
+files[] = views/component_entity_handler_delete_link_field.inc
+files[] = views/component_entity_handler_edit_link_field.inc
+files[] = views/component_entity_handler_component_entity_operations_field.inc

@@ -1,0 +1,241 @@
+<?php
+
+/**
+ * @file
+ * Sets up the base table for our entity and a table to store information about
+ * the entity types.
+ */
+
+
+/**
+ * Implements hook_schema().
+ */
+function component_entity_schema() {
+  $schema = array();
+
+  $schema['component_entity'] = array(
+    'description' => 'The base table for component_entity entities.',
+    'fields' => array(
+      'wcid' => array(
+        'description' => 'Primary Key: Identifier for a component_entity.',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'bundle' => array(
+        'description' => 'The {component_entity_type}.type of this component_entity.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'language' => array(
+        'description' => 'The language of the component_entity.',
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'created' => array(
+        'description' => 'The Unix timestamp when the component_entity was created.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'changed' => array(
+        'description' => 'The Unix timestamp when the component_entity was most recently saved.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'data' => array(
+        'type' => 'blob',
+        'not null' => FALSE,
+        'size' => 'big',
+        'serialize' => TRUE,
+        'description' => 'A serialized array of additional data.',
+      ),
+      'form_key' => array(
+        'description' => 'When the form is displayed and processed, this key can be used to reference the results.',
+        'type' => 'varchar',
+        'length' => 128,
+      ),
+      'name' => array(
+        'description' => 'The label for this component.',
+        'type' => 'varchar',
+        'length' => 255,
+      ),
+      'type' => array(
+        'description' => 'The field type of this component (textfield, select, hidden, etc.).',
+        'type' => 'varchar',
+        'length' => 16,
+      ),
+      'value' => array(
+        'description' => 'The default value of the component when displayed to the end-user.',
+        'type' => 'text',
+        'not null' => TRUE,
+      ),
+      'extra' => array(
+        'description' => 'Additional information unique to the display or processing of this component.',
+        'type' => 'text',
+        'not null' => TRUE,
+      ),
+      'mandatory' => array(
+        'description' => 'Boolean flag for if this component is required.',
+        'type' => 'int',
+        'size' => 'tiny',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'weight' => array(
+        'description' => 'Determines the position of this component in the form.',
+        'type' => 'int',
+        'size' => 'small',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+    ),
+    'primary key' => array('wcid'),
+    'indexes' => array(
+      'type' => array('bundle'),
+    ),
+  );
+
+  $schema['component_entity_type'] = array(
+    'description' => 'Stores information about defined component_entity types.',
+    'fields' => array(
+      'id' => array(
+        'type' => 'serial',
+        'not null' => TRUE,
+        'description' => 'Primary Key: Unique component_entity type identifier.',
+      ),
+      'bundle' => array(
+        'description' => 'The machine-readable name of this component_entity type.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+      ),
+      'label' => array(
+        'description' => 'The human-readable name of this component_entity type.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'weight' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'size' => 'tiny',
+        'description' => 'The weight of this component_entity type in relation to others.',
+      ),
+      'data' => array(
+        'type' => 'text',
+        'not null' => FALSE,
+        'size' => 'big',
+        'serialize' => TRUE,
+        'description' => 'A serialized array of additional data related to this component_entity type.',
+      ),
+    ) + entity_exportable_schema_fields(),
+    'primary key' => array('id'),
+    'unique keys' => array(
+      'bundle' => array('bundle'),
+    ),
+  );
+
+  return $schema;
+}
+
+function component_entity_enable() {
+  db_insert('component_entity_type')->fields(array(
+    'bundle' => 'component_entity',
+    'label' => t("Component Entity"),
+  ))->execute();
+}
+
+function component_entity_install() {
+  $vocabulary = taxonomy_vocabulary_machine_name_load('tags');
+  if (!$vocabulary) {
+    $edit = array(
+      'name' => t("Tags"),
+      'machine_name' => 'tags',
+      'hierarchy' => 1,
+      'module' => 'component_entity',
+    );
+    $vocabulary = (object) $edit;
+    taxonomy_vocabulary_save($vocabulary);
+  }
+  if (!field_info_field('field_tags')) {
+    $field = array(
+      'field_name' => 'field_tags',
+      'type' => 'taxonomy_term_reference',
+      'cardinality' => 1,
+      'settings' => array(
+        'cardinality' => -1,
+        'allowed_values' => array(
+          array(
+            'vocabulary' => $vocabulary->machine_name,
+            'parent' => 0,
+          ),
+        ),
+      ),
+    );
+    field_create_field($field);
+  }
+  if (!field_info_instance('component_entity', 'field_tags', 'component_entity')) {
+    $instance = array(
+      'field_name' => 'field_tags',
+      'entity_type' => 'component_entity',
+      'label' => $vocabulary->name,
+      'bundle' => 'component_entity',
+      'required' => FALSE,
+      'widget' => array(
+        'type' => 'options_select',
+      ),
+      'display' => array(
+        'default' => array(
+          'type' => 'hidden',
+          'weight' => 10,
+        ),
+        'teaser' => array(
+          'type' => 'hidden',
+          'weight' => 10,
+        ),
+      ),
+    );
+    field_create_instance($instance);
+  }
+  if (!field_info_field('field_sample_additional')) {
+    $field = array(
+      'field_name' => 'field_sample_additional',
+      'type' => 'text',
+      'cardinality' => 1,
+    );
+    field_create_field($field);
+  }
+  if (!field_info_instance('component_entity', 'field_sample_additional', 'component_entity')) {
+    $instance = array(
+      'field_name' => 'field_sample_additional',
+      'entity_type' => 'component_entity',
+      'bundle' => 'component_entity',
+      'label' => t("Sample Additional Field"),
+      'widget' => array(
+        'type' => 'text',
+        'weight' => 60,
+      ),
+      'settings' => array('display_summary' => FALSE),
+      'display' => array(
+        'default' => array(
+          'label' => 'hidden',
+          'type' => 'text_default',
+        ),
+        'teaser' => array(
+          'label' => 'hidden',
+          'type' => 'text_default',
+        ),
+      ),
+    );  
+    field_create_instance($instance);
+  }
+}    
+

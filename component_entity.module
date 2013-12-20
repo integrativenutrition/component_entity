@@ -1,0 +1,499 @@
+<?php
+
+/**
+ * @file
+ * Module for the ComponentEntity Entity - a starting point to create your own Entity
+ * and associated administration interface
+ */  
+
+/**
+ * Display a view as a table style.
+ */
+function component_entity_preprocess_views_view_table(&$vars) {
+  $view = $vars['view'];
+  if($view->name == 'component_entities') {
+    $vars['theme_hook_suggestions'][] = 'views_view_table__component_entities_ex';
+  }
+  $vars['component_entity_webform_page'] = _drupal_session_read('component_entity_webform_page');
+}
+
+function component_entity_preprocess_views_view_field(&$vars) {
+  if($vars['view']->name == 'component_entities') {
+    if($vars['field']->field == 'wcid') {
+      $vars['theme_hook_suggestions'][] = 'views_view_field__component_entities__wcid_ex';
+    }
+  }
+}
+
+/**
+ * Implement hook_theme().
+ */
+function component_entity_theme() {
+  return array(
+    'component_entity_add_list' => array(
+      'variables' => array('content' => array()),
+      'file' => 'component_entity.admin.inc',
+    ),
+    'views_view_table__component_entities_ex' => array(
+      'variables' => array('content' => array(), 'row_classes' => array()),
+      'template' => 'views-view-table--component-entities-ex',
+    ),
+    'views_view_field__component_entities__wcid_ex' => array(
+      'variables' => array('content' => array(), 'row_classes' => array()),
+      'template' => 'views-view-field--component-entities--wcid-ex',
+    ),
+    'component_entity' => array(
+      'render element' => 'elements',
+      'template' => 'component-entity',
+    ),
+  );
+}  
+
+function component_entity_init() {
+}
+
+function component_entity_add_from_library($node) {
+  if(empty($_POST)) {
+      _drupal_session_write('component_entity_webform_page', base_path() . 'node/' . $node->nid . '/webform/add-from-library');
+      drupal_goto('admin/content/component_entities');
+  }
+  else {
+    // Ensure a webform record exists.
+	webform_ensure_record($node);
+
+	//$results = db_query('SELECT wcid from {component_entity}');
+	$wcids = $_POST['wcids'];
+	foreach($wcids as $wcid)
+	{
+	  $component_entity_result = db_query("SELECT name, form_key, type, value, extra, mandatory, weight from {component_entity} WHERE wcid = :wcid", array(':wcid'=>$wcid));
+	  foreach($component_entity_result as $component_entity) {
+		$component_entity = (array) $component_entity;
+		$component_entity['nid'] = $node->nid;
+		$component_entity['pid'] = 0;
+		$component_entity['extra'] = unserialize($component_entity['extra']);
+		webform_component_insert($component_entity);
+	  }
+	  drupal_set_message(t('New component %name added.', array('%name' => $component_entity['name'])));
+	}
+	drupal_goto('node/' . $node->nid . '/webform/components');
+  }
+}
+
+function component_entity_menu() {
+  $items = array();
+  $items['node/%webform_menu/webform/add-from-library'] = array(
+    'title' => t('Add from library'),
+    'page callback' => 'component_entity_add_from_library',
+    'page arguments' => array(1),
+    'access callback' => 'node_access',
+    'access arguments' => array('update', 1),
+    'weight' => 0,
+    'type' => MENU_LOCAL_TASK,
+  );
+  return $items;
+}
+
+function component_entity_form_alter(&$form, &$form_state, $form_id) {
+  //alter form edit component of webform
+  if ($form_id == 'webform_component_edit_form' && arg(4) == 'new') {
+    $form['library'] = array(
+      '#title' => t('Library'),
+      '#type' => 'fieldset',
+      '#collapsible' => TRUE,
+      '#collapsed' => FALSE,
+      '#attributes' => array('class' => array('collapsible')),
+      '#weight' => 0,
+    );
+    $form['library']['save_for_future_use'] = array(
+      '#title' => t('Saving for future use'),
+      '#type' => 'checkbox',
+      '#value' => 1,
+    );
+    $form['library']['entity_fields_container'] = array(
+      '#type' => 'container',
+      '#states' => array(
+        'visible' => array(
+          ':input[name="library[save_for_future_use]"]' => array(
+            'checked' => TRUE,
+          ),
+        ),
+      ),
+    );
+    $instances = field_info_instances('component_entity', 'component_entity');
+    foreach($instances as $field_name => $instance) {
+      $form['library']['entity_fields_container'][$field_name] = array(
+        '#type' => 'textfield',
+        '#title' => $instance['label'],
+        '#value' => '',
+      );
+    }
+    /*
+    $entities = entity_load('component_entity', array(2), array(), FALSE);
+    $entity = $entities[2];
+    field_attach_form('component_entity', $entity, $form, $form_state, NULL, array());
+    $instances = field_info_instances('component_entity', 'component_entity');
+    foreach($instances as $field_name => $instance) {
+      $form['library']['entity_fields_container'][$field_name] = $form[$field_name];
+      unset($form[$field_name]);
+    }
+     * 
+     */
+    $form['#submit'][] = 'component_entity_form_alter_submit';
+  } 
+}
+
+function component_entity_form_alter_submit(&$form, &$form_state) {
+  $inputs = $form_state['input'];
+  $values = $form_state['values'];
+  if ($inputs['library']['save_for_future_use']) {
+    /*
+    $entities = entity_load('component_entity', array(2), array(), FALSE);
+    $entity = $entities[2];
+    field_attach_submit('component_entity', $entity, $form, $form_state);
+     */
+    $entity_info = $values;
+    $entity_info['bundle'] = 'component_entity';
+    $instances = field_info_instances('component_entity', 'component_entity');
+    foreach($instances as $field_name => $instance) {
+      $entity_info[$field_name] = isset($inputs['library']['entity_fields_container'][$field_name]) ? $inputs['library']['entity_fields_container'][$field_name] : "";
+    } 
+    require_once drupal_get_path('module', 'component_entity') . '/generator/field_generator.inc';
+    require_once drupal_get_path('module', 'component_entity') . '/generator/component_entity_generator.inc';
+    component_entity_generate_entity($entity_info);
+  }
+}
+
+/**
+ * Implement hook_entity_info().
+ */
+function component_entity_entity_info() {
+  $return['component_entity'] = array(
+    'label' => t('ComponentEntity'),
+    // The entity class and controller class extend the classes provided by the
+    // Entity API
+    'entity class' => 'ComponentEntity',
+    'controller class' => 'ComponentEntityController',
+    'base table' => 'component_entity',
+    'fieldable' => TRUE,
+    'entity keys' => array(
+      'id' => 'wcid',
+      'bundle' => 'bundle',
+    ),
+    // Bundles are defined by the component_entity types below
+    'bundles' => array(),
+    // Bundle keys tell the FieldAPI how to extract information from the bundle objects
+    'bundle keys' => array(
+      'bundle' => 'bundle',
+    ),
+    'label callback' => 'entity_class_label',
+    'uri callback' => 'entity_class_uri',
+    'creation callback' => 'component_entity_create',
+    'access callback' => 'component_entity_access',
+    'module' => 'component_entity',
+    // The information below is used by the ComponentEntityUIController (which extends the EntityDefaultUIController)
+    'admin ui' => array(
+      'path' => 'admin/content/component_entities',
+      'file' => 'component_entity.admin.inc',
+      'controller class' => 'ComponentEntityUIController',
+      'menu wildcard' => '%component_entity',
+    ),
+      
+  );
+  // The entity that holds information about the entity types	  
+  $return['component_entity_type'] = array(
+    'label' => t('ComponentEntity Type'),
+    'entity class' => 'ComponentEntityType',
+    'controller class' => 'ComponentEntityTypeController',
+    'base table' => 'component_entity_type',
+    'fieldable' => TRUE,
+    'bundle of' => 'component_entity',
+    'exportable' => FALSE,
+    'entity keys' => array(
+      'id' => 'id',
+      'name' => 'bundle',
+      'label' => 'label',
+    ),
+    'bundles' => array (),
+    'access callback' => 'component_entity_type_access',
+    'module' => 'component_entity',
+    // Enable the entity API's admin UI.
+    'admin ui' => array(
+      'path' => 'admin/structure/component_entity_types',
+      'file' => 'component_entity_type.admin.inc',
+      'controller class' => 'ComponentEntityTypeUIController',
+    ),
+  );
+
+  return $return;
+}
+
+
+/**
+ * Implements hook_entity_info_alter().
+ *
+ * We are adding the info about the component_entity types via a hook to avoid a recursion
+ * issue as loading the component_entity types requires the entity info as well.
+ *
+ * @todo This needs to be improved
+ */
+function component_entity_entity_info_alter(&$entity_info) {
+  foreach (component_entity_get_types() as $type => $info) {
+    $entity_info['component_entity']['bundles'][$type] = array(
+      'label' => $info->label,
+      'admin' => array(
+        'path' => 'admin/structure/component_entity_types/manage/%component_entity_type',
+        'real path' => 'admin/structure/component_entity_types/manage/' . $type,
+        'bundle argument' => 4,
+        'access arguments' => array('administer component_entity types'),
+      ),
+    );
+  }
+}
+  
+
+/**
+ * Implements hook_permission().
+ */
+function component_entity_permission() {
+  // We set up permisssions to manage entity types, manage all entities and the
+  // permissions for each individual entity
+  $permissions = array(
+    'administer component_entity types' => array(
+      'title' => t('Administer component_entity types'),
+      'description' => t('Create and delete fields for component_entity types, and set their permissions.'),
+    ),
+    'administer component_entities' => array(
+      'title' => t('Administer component_entities'),
+      'description' => t('Edit and delete all component_entities'),
+    ),  
+  );
+  
+  //Generate permissions per component_entity 
+  foreach (component_entity_get_types() as $type) {
+    $type_name = check_plain($type->type);
+    $permissions += array(
+      "edit any $type_name component_entity" => array(
+        'title' => t('%type_name: Edit any component_entity', array('%type_name' => $type->label)),
+      ),
+      "view any $type_name component_entity" => array(
+        'title' => t('%type_name: View any component_entity', array('%type_name' => $type->label)),
+      ),
+    );
+  }
+  return $permissions;  
+}
+
+
+/**
+ * Determines whether the given user has access to a component_entity.
+ *
+ * @param $op
+ *   The operation being performed. One of 'view', 'update', 'create', 'delete'
+ *   or just 'edit' (being the same as 'create' or 'update').
+ * @param $component_entity
+ *   Optionally a component_entity or a component_entity type to check access for. If nothing is
+ *   given, access for all component_entities is determined.
+ * @param $account
+ *   The user to check for. Leave it to NULL to check for the global user.
+ * @return boolean
+ *   Whether access is allowed or not.
+ */
+function component_entity_access($op, $component_entity = NULL, $account = NULL) {
+  if (user_access('administer component_entities', $account)) {
+    return TRUE;
+  }
+  if (isset($component_entity) && $type_name = $component_entity->type) {
+    $op = ($op == 'view') ? 'view' : 'edit';
+    if (user_access("$op any $type_name component_entity", $account)) {
+      return TRUE;
+    }
+  }
+  return FALSE;
+}
+
+
+/**
+ * Access callback for the entity API.
+ */
+function component_entity_type_access($op, $type = NULL, $account = NULL) {
+  return user_access('administer component_entity types', $account);
+}
+
+
+/**
+ * Gets an array of all component_entity types, keyed by the type name.
+ *
+ * @param $type_name
+ *   If set, the type with the given name is returned.
+ * @return ComponentEntityType[]
+ *   Depending whether $type isset, an array of component_entity types or a single one.
+ */
+function component_entity_get_types($type_name = NULL) {
+  // entity_load will get the Entity controller for our component_entity entity and call the load
+  // function of that object - we are loading entities by name here.
+  $types = entity_load_multiple_by_name('component_entity_type', isset($type_name) ? array($type_name) : FALSE);
+  return isset($type_name) ? reset($types) : $types;
+}
+
+
+/**
+ * Menu argument loader; Load a component_entity type by string.
+ *
+ * @param $type
+ *   The machine-readable name of a component_entity type to load.
+ * @return
+ *   A component_entity type array or FALSE if $type does not exist.
+ */
+function component_entity_type_load($type) {
+  return component_entity_get_types($type);
+}
+
+
+/**
+ * Fetch a component_entity object. Make sure that the wildcard you choose 
+ * in the component_entity entity definition fits the function name here.
+ *
+ * @param $wcid
+ *   Integer specifying the component_entity id.
+ * @param $reset
+ *   A boolean indicating that the internal cache should be reset.
+ * @return
+ *   A fully-loaded $component_entity object or FALSE if it cannot be loaded.
+ *
+ * @see component_entity_load_multiple()
+ */
+function component_entity_load($wcid, $reset = FALSE) {
+  $component_entities = component_entity_load_multiple(array($wcid), array(), $reset);
+  return reset($component_entities);
+}
+
+
+/**
+ * Load multiple component_entities based on certain conditions.
+ *
+ * @param $wcids
+ *   An array of component_entity IDs.
+ * @param $conditions
+ *   An array of conditions to match against the {component_entity} table.
+ * @param $reset
+ *   A boolean indicating that the internal cache should be reset.
+ * @return
+ *   An array of component_entity objects, indexed by wcid.
+ *
+ * @see entity_load()
+ * @see component_entity_load()
+ */
+function component_entity_load_multiple($wcids = array(), $conditions = array(), $reset = FALSE) {
+  return entity_load('component_entity', $wcids, $conditions, $reset);
+}
+
+
+/**
+ * Deletes a component_entity.
+ */
+function component_entity_delete(ComponentEntity $component_entity) {
+  $component_entity->delete();
+}
+
+
+/**
+ * Delete multiple component_entities.
+ *
+ * @param $wcids
+ *   An array of component_entity IDs.
+ */
+function component_entity_delete_multiple(array $wcids) {
+  entity_get_controller('component_entity')->delete($wcids);
+}
+
+
+/**
+ * Create a component_entity object.
+ */
+function component_entity_create($values = array()) {
+  return entity_get_controller('component_entity')->create($values);
+}
+
+
+/**
+ * Saves a component_entity to the database.
+ *
+ * @param $component_entity
+ *   The component_entity object.
+ */
+function component_entity_save(ComponentEntity $component_entity) {
+  return $component_entity->save();
+}
+
+
+/**
+ * Saves a component_entity type to the db.
+ */
+function component_entity_type_save(ComponentEntityType $type) {
+  $type->save();
+}
+
+
+/**
+ * Deletes a component_entity type from the db.
+ */
+function component_entity_type_delete(ComponentEntityType $type) {
+  $type->delete();
+}
+
+
+/**
+ * URI callback for component_entities
+ */
+function component_entity_uri(ComponentEntity $component_entity){
+  return array(
+    'path' => 'component_entity/' . $component_entity->wcid,
+  );
+}
+
+
+/**
+ * Menu title callback for showing individual entities
+ */
+function component_entity_page_title(ComponentEntity $component_entity){
+  return $component_entity->name;
+}
+
+
+/**
+ * Sets up content to show an individual component_entity
+ * @todo - get rid of drupal_set_title();
+ */
+function component_entity_page_view($component_entity, $view_mode = 'full') {    
+  $controller = entity_get_controller('component_entity');  
+  $content = $controller->view(array($component_entity->wcid => $component_entity));
+  drupal_set_title($component_entity->name);
+  return $content;
+}
+
+
+/**
+ * Implements hook_views_api().
+ */
+function component_entity_views_api() {
+  return array(
+    'api' => 3,
+    'path' => drupal_get_path('module', 'component_entity') . '/views',
+  );
+}
+
+/**
+ * Implements hook_menu_local_tasks_alter().
+ */
+function component_entity_menu_local_tasks_alter(&$data, $router_item, $root_path) {
+  // Add action link 'admin/structure/component_entities/add' on 'admin/structure/component_entities'.
+  if ($root_path == 'admin/content/component_entities') {
+    $item = menu_get_item('admin/content/component_entities/add');
+    if ($item['access']) {
+      $data['actions']['output'][] = array(
+        '#theme' => 'menu_local_action',
+        '#link' => $item,
+      );
+    }
+  }
+}
