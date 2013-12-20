@@ -1,4 +1,8 @@
 <?php
+/**
+ * @file
+ */
+
 function component_entity_generate_entity($entity_info, $wcid = NULL) {
   if ($wcid) {
     $entity = entity_load_single($entity_info['bundle'], $wcid);
@@ -13,12 +17,12 @@ function component_entity_generate_entity($entity_info, $wcid = NULL) {
       'changed' => isset($entity_info['changed']) && $entity_info['changed'] ? $entity_info['changed'] : time(),
       'language' => isset($entity_info['language']) ? $entity_info['language'] : 
         (language_default('language') == 'en' ? LANGUAGE_NONE : language_default('language')),
-	  'type' => isset($entity_info['type']) ? $entity_info['type'] : '',
-	  'form_key' => isset($entity_info['form_key']) ? $entity_info['form_key'] : '',
-	  'value' => isset($entity_info['value']) ? $entity_info['value'] : '',
-	  'extra' => isset($entity_info['extra']) ? serialize($entity_info['extra']) : array(),
-	  'mandatory' => isset($entity_info['mandatory']) ? $entity_info['mandatory'] : 0,
-	  'weight' => isset($entity_info['weight']) ? $entity_info['weight'] : 0,
+      'type' => isset($entity_info['type']) ? $entity_info['type'] : '',
+      'form_key' => isset($entity_info['form_key']) ? $entity_info['form_key'] : '',
+      'value' => isset($entity_info['value']) ? $entity_info['value'] : '',
+      'extra' => isset($entity_info['extra']) ? serialize($entity_info['extra']) : array(),
+      'mandatory' => isset($entity_info['mandatory']) ? $entity_info['mandatory'] : 0,
+      'weight' => isset($entity_info['weight']) ? $entity_info['weight'] : 0,
     ));
     
   }

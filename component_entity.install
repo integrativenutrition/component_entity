@@ -2,8 +2,6 @@
 
 /**
  * @file
- * Sets up the base table for our entity and a table to store information about
- * the entity types.
  */
 
 
@@ -146,6 +144,9 @@ function component_entity_schema() {
   return $schema;
 }
 
+/*
+ * Implements hook_entity_enable().
+ */
 function component_entity_enable() {
   db_insert('component_entity_type')->fields(array(
     'bundle' => 'component_entity',
@@ -153,6 +154,9 @@ function component_entity_enable() {
   ))->execute();
 }
 
+/*
+ * Implements hook_entity_install().
+ */
 function component_entity_install() {
   $vocabulary = taxonomy_vocabulary_machine_name_load('tags');
   if (!$vocabulary) {
@@ -238,4 +242,3 @@ function component_entity_install() {
     field_create_instance($instance);
   }
 }    
-

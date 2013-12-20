@@ -1,4 +1,8 @@
 <?php
+/**
+ * @file
+ */
+
 function component_entity_text_generate($field_value, $object, $field, $instance, $bundle) {
   $object_field = array();
   $object_field['format'] = 'full_html';

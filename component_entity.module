@@ -2,19 +2,14 @@
 
 /**
  * @file
- * Module for the ComponentEntity Entity - a starting point to create your own Entity
- * and associated administration interface
  */  
 
-/**
- * Display a view as a table style.
- */
 function component_entity_preprocess_views_view_table(&$vars) {
   $view = $vars['view'];
   if($view->name == 'component_entities') {
     $vars['theme_hook_suggestions'][] = 'views_view_table__component_entities_ex';
   }
-  $vars['component_entity_webform_page'] = _drupal_session_read('component_entity_webform_page');
+  $vars['component_entity_webform_page'] = variable_get('component_entity_webform_page', '#');
 }
 
 function component_entity_preprocess_views_view_field(&$vars) {
@@ -26,7 +21,7 @@ function component_entity_preprocess_views_view_field(&$vars) {
 }
 
 /**
- * Implement hook_theme().
+ * Implements hook_theme().
  */
 function component_entity_theme() {
   return array(
@@ -49,36 +44,34 @@ function component_entity_theme() {
   );
 }  
 
-function component_entity_init() {
-}
-
 function component_entity_add_from_library($node) {
   if(empty($_POST)) {
-      _drupal_session_write('component_entity_webform_page', base_path() . 'node/' . $node->nid . '/webform/add-from-library');
-      drupal_goto('admin/content/component_entities');
+    variable_set('component_entity_webform_page', base_path() . 'node/' . $node->nid . '/webform/add-from-library');
+    drupal_goto('admin/content/component_entities');
   }
-  else {
-    // Ensure a webform record exists.
-	webform_ensure_record($node);
-
-	//$results = db_query('SELECT wcid from {component_entity}');
-	$wcids = $_POST['wcids'];
-	foreach($wcids as $wcid)
-	{
-	  $component_entity_result = db_query("SELECT name, form_key, type, value, extra, mandatory, weight from {component_entity} WHERE wcid = :wcid", array(':wcid'=>$wcid));
-	  foreach($component_entity_result as $component_entity) {
-		$component_entity = (array) $component_entity;
-		$component_entity['nid'] = $node->nid;
-		$component_entity['pid'] = 0;
-		$component_entity['extra'] = unserialize($component_entity['extra']);
-		webform_component_insert($component_entity);
-	  }
-	  drupal_set_message(t('New component %name added.', array('%name' => $component_entity['name'])));
-	}
-	drupal_goto('node/' . $node->nid . '/webform/components');
+  elseif(isset($_POST['wcids'])) {
+    variable_del('component_entity_webform_page');
+    webform_ensure_record($node);
+    $wcids = $_POST['wcids'];
+    foreach($wcids as $wcid)
+    {
+      $component_entity_result = db_query("SELECT name, form_key, type, value, extra, mandatory, weight from {component_entity} WHERE wcid = :wcid", array(':wcid'=>$wcid));
+      foreach($component_entity_result as $component_entity) {
+        $component_entity = (array) $component_entity;
+        $component_entity['nid'] = $node->nid;
+        $component_entity['pid'] = 0;
+        $component_entity['extra'] = unserialize($component_entity['extra']);
+        webform_component_insert($component_entity);
+      }
+      drupal_set_message(t('New component %name added.', array('%name' => $component_entity['name'])));
+    }
+    drupal_goto('node/' . $node->nid . '/webform/components');
   }
 }
 
+/**
+ * Implements hook_menu().
+ */
 function component_entity_menu() {
   $items = array();
   $items['node/%webform_menu/webform/add-from-library'] = array(
@@ -93,8 +86,10 @@ function component_entity_menu() {
   return $items;
 }
 
+/**
+ * Implements hook_form_alter().
+ */
 function component_entity_form_alter(&$form, &$form_state, $form_id) {
-  //alter form edit component of webform
   if ($form_id == 'webform_component_edit_form' && arg(4) == 'new') {
     $form['library'] = array(
       '#title' => t('Library'),
@@ -164,13 +159,11 @@ function component_entity_form_alter_submit(&$form, &$form_state) {
 }
 
 /**
- * Implement hook_entity_info().
+ * Implements hook_entity_info().
  */
 function component_entity_entity_info() {
   $return['component_entity'] = array(
     'label' => t('ComponentEntity'),
-    // The entity class and controller class extend the classes provided by the
-    // Entity API
     'entity class' => 'ComponentEntity',
     'controller class' => 'ComponentEntityController',
     'base table' => 'component_entity',
@@ -179,9 +172,7 @@ function component_entity_entity_info() {
       'id' => 'wcid',
       'bundle' => 'bundle',
     ),
-    // Bundles are defined by the component_entity types below
     'bundles' => array(),
-    // Bundle keys tell the FieldAPI how to extract information from the bundle objects
     'bundle keys' => array(
       'bundle' => 'bundle',
     ),
@@ -190,7 +181,6 @@ function component_entity_entity_info() {
     'creation callback' => 'component_entity_create',
     'access callback' => 'component_entity_access',
     'module' => 'component_entity',
-    // The information below is used by the ComponentEntityUIController (which extends the EntityDefaultUIController)
     'admin ui' => array(
       'path' => 'admin/content/component_entities',
       'file' => 'component_entity.admin.inc',
@@ -199,7 +189,6 @@ function component_entity_entity_info() {
     ),
       
   );
-  // The entity that holds information about the entity types	  
   $return['component_entity_type'] = array(
     'label' => t('ComponentEntity Type'),
     'entity class' => 'ComponentEntityType',
@@ -216,7 +205,6 @@ function component_entity_entity_info() {
     'bundles' => array (),
     'access callback' => 'component_entity_type_access',
     'module' => 'component_entity',
-    // Enable the entity API's admin UI.
     'admin ui' => array(
       'path' => 'admin/structure/component_entity_types',
       'file' => 'component_entity_type.admin.inc',
@@ -227,14 +215,8 @@ function component_entity_entity_info() {
   return $return;
 }
 
-
 /**
  * Implements hook_entity_info_alter().
- *
- * We are adding the info about the component_entity types via a hook to avoid a recursion
- * issue as loading the component_entity types requires the entity info as well.
- *
- * @todo This needs to be improved
  */
 function component_entity_entity_info_alter(&$entity_info) {
   foreach (component_entity_get_types() as $type => $info) {
@@ -255,8 +237,6 @@ function component_entity_entity_info_alter(&$entity_info) {
  * Implements hook_permission().
  */
 function component_entity_permission() {
-  // We set up permisssions to manage entity types, manage all entities and the
-  // permissions for each individual entity
   $permissions = array(
     'administer component_entity types' => array(
       'title' => t('Administer component_entity types'),
@@ -268,7 +248,6 @@ function component_entity_permission() {
     ),  
   );
   
-  //Generate permissions per component_entity 
   foreach (component_entity_get_types() as $type) {
     $type_name = check_plain($type->type);
     $permissions += array(
@@ -282,7 +261,6 @@ function component_entity_permission() {
   }
   return $permissions;  
 }
-
 
 /**
  * Determines whether the given user has access to a component_entity.
@@ -311,14 +289,12 @@ function component_entity_access($op, $component_entity = NULL, $account = NULL)
   return FALSE;
 }
 
-
 /**
  * Access callback for the entity API.
  */
 function component_entity_type_access($op, $type = NULL, $account = NULL) {
   return user_access('administer component_entity types', $account);
 }
-
 
 /**
  * Gets an array of all component_entity types, keyed by the type name.
@@ -329,12 +305,9 @@ function component_entity_type_access($op, $type = NULL, $account = NULL) {
  *   Depending whether $type isset, an array of component_entity types or a single one.
  */
 function component_entity_get_types($type_name = NULL) {
-  // entity_load will get the Entity controller for our component_entity entity and call the load
-  // function of that object - we are loading entities by name here.
   $types = entity_load_multiple_by_name('component_entity_type', isset($type_name) ? array($type_name) : FALSE);
   return isset($type_name) ? reset($types) : $types;
 }
-
 
 /**
  * Menu argument loader; Load a component_entity type by string.
@@ -347,7 +320,6 @@ function component_entity_get_types($type_name = NULL) {
 function component_entity_type_load($type) {
   return component_entity_get_types($type);
 }
-
 
 /**
  * Fetch a component_entity object. Make sure that the wildcard you choose 
@@ -366,7 +338,6 @@ function component_entity_load($wcid, $reset = FALSE) {
   $component_entities = component_entity_load_multiple(array($wcid), array(), $reset);
   return reset($component_entities);
 }
-
 
 /**
  * Load multiple component_entities based on certain conditions.
@@ -387,14 +358,12 @@ function component_entity_load_multiple($wcids = array(), $conditions = array(),
   return entity_load('component_entity', $wcids, $conditions, $reset);
 }
 
-
 /**
  * Deletes a component_entity.
  */
 function component_entity_delete(ComponentEntity $component_entity) {
   $component_entity->delete();
 }
-
 
 /**
  * Delete multiple component_entities.
@@ -406,14 +375,12 @@ function component_entity_delete_multiple(array $wcids) {
   entity_get_controller('component_entity')->delete($wcids);
 }
 
-
 /**
  * Create a component_entity object.
  */
 function component_entity_create($values = array()) {
   return entity_get_controller('component_entity')->create($values);
 }
-
 
 /**
  * Saves a component_entity to the database.
@@ -425,7 +392,6 @@ function component_entity_save(ComponentEntity $component_entity) {
   return $component_entity->save();
 }
 
-
 /**
  * Saves a component_entity type to the db.
  */
@@ -433,14 +399,12 @@ function component_entity_type_save(ComponentEntityType $type) {
   $type->save();
 }
 
-
 /**
  * Deletes a component_entity type from the db.
  */
 function component_entity_type_delete(ComponentEntityType $type) {
   $type->delete();
 }
-
 
 /**
  * URI callback for component_entities
@@ -451,14 +415,12 @@ function component_entity_uri(ComponentEntity $component_entity){
   );
 }
 
-
 /**
  * Menu title callback for showing individual entities
  */
 function component_entity_page_title(ComponentEntity $component_entity){
   return $component_entity->name;
 }
-
 
 /**
  * Sets up content to show an individual component_entity
@@ -470,7 +432,6 @@ function component_entity_page_view($component_entity, $view_mode = 'full') {
   drupal_set_title($component_entity->name);
   return $content;
 }
-
 
 /**
  * Implements hook_views_api().

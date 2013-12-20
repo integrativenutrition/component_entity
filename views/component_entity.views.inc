@@ -2,12 +2,10 @@
 
 /**
  * @file
- * Providing extra functionality for the ComponentEntity UI via views.
  */
 
-
 /**
- * Implements hook_views_data()
+ * Implements hook_views_data_alter()
  */
 function component_entity_views_data_alter(&$data) { 
   $data['component_entity']['link_component_entity'] = array(
@@ -31,8 +29,6 @@ function component_entity_views_data_alter(&$data) {
       'handler' => 'component_entity_handler_delete_link_field',
     ),
   );
-  // This content of this field are decided based on the menu structure that
-  // follows component_entities/component_entity/%wcid/op
   $data['component_entity']['operations'] = array(
     'field' => array(
       'title' => t('Operations links'),

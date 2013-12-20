@@ -1,8 +1,7 @@
 <?php
 
 /**
- * This field handler aggregates operations that can be done on a component_entity
- * under a single field providing a more flexible way to present them in a view
+ * @file
  */
 class component_entity_handler_component_entity_operations_field extends views_handler_field {
   function construct() {

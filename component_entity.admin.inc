@@ -2,11 +2,6 @@
 
 /**
  * @file
- * ComponentEntity editing UI.
- *
- * We make very little use of the EntityAPI interface for this - preferring instead to use
- * views. That offers more flexibility to change a UI that will, more often than not,
- * be end-user facing.
  */
 
 /**
@@ -18,7 +13,6 @@
  * @see component_entity_edit_form()
  */
 function component_entity_form_wrapper($component_entity) {
-  // Add the breadcrumb for the form's location.
   component_entity_set_breadcrumb();
   return drupal_get_form('component_entity_edit_form', $component_entity);
 }
@@ -33,8 +27,6 @@ function component_entity_form_wrapper($component_entity) {
  * @see component_entity_edit_form()
  */
 function component_entity_delete_form_wrapper($component_entity) {
-  // Add the breadcrumb for the form's location.
-  //component_entity_set_breadcrumb();
   return drupal_get_form('component_entity_delete_form', $component_entity);
 }
 
@@ -47,7 +39,6 @@ function component_entity_delete_form_wrapper($component_entity) {
  *     with only a component_entity type defined.
  */
 function component_entity_edit_form($form, &$form_state, $component_entity) {
-  // Add the default field elements.
   $form['name'] = array(
     '#type' => 'textfield',
     '#title' => t('ComponentEntity Name'),
@@ -59,7 +50,6 @@ function component_entity_edit_form($form, &$form_state, $component_entity) {
   
   $form['data']['#tree'] = TRUE;
 
-  // Add the field related form elements.
   $form_state['component_entity'] = $component_entity;
   field_attach_form('component_entity', $component_entity, $form, $form_state);
 
@@ -69,8 +59,6 @@ function component_entity_edit_form($form, &$form_state, $component_entity) {
     '#weight' => 400,
   );
 
-  // We add the form's #submit array to this button along with the actual submit
-  // handler to preserve any submit handlers added by a form callback_wrapper.
   $submit = array();
 
   if (!empty($form['#submit'])) {
@@ -93,8 +81,6 @@ function component_entity_edit_form($form, &$form_state, $component_entity) {
     );
   }
 
-  // We append the validate handler to #validate in case a form callback_wrapper
-  // is used to add validate handlers earlier.
   $form['#validate'][] = 'component_entity_edit_form_validate';
   return $form;
 }
@@ -119,9 +105,7 @@ function component_entity_edit_form_validate(&$form, &$form_state) {
 function component_entity_edit_form_submit(&$form, &$form_state) {
   
   $component_entity = entity_ui_controller('component_entity')->entityFormSubmitBuildEntity($form, $form_state);
-  // Save the component_entity and go back to the list of component_entities
   
-  // Add in created and changed times.
   if ($component_entity->is_new = isset($component_entity->is_new) ? $component_entity->is_new : 0){
     $component_entity->created = time();
   }
@@ -235,6 +219,3 @@ function component_entity_set_breadcrumb() {
 
   drupal_set_breadcrumb($breadcrumb);
 }
-
-
-
